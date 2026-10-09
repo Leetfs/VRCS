@@ -75,6 +75,9 @@ jobs:
         with:
           name: obs-release-${{ github.run_id }}
           if-no-files-found: ignore
+          # These explicit paths contain logs/metadata only; signing keys are
+          # never included. upload-artifact otherwise ignores .release/.
+          include-hidden-files: true
           path: |
             .release/logs/
             .release/release.json
