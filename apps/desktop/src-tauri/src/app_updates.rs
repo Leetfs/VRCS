@@ -7,8 +7,14 @@ use tauri::ipc::Channel;
 use tauri::{AppHandle, State};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
-const UPDATE_ENDPOINT: &str =
+const DEFAULT_UPDATE_ENDPOINT: &str =
     "https://github.com/Dreaminko/VRCS/releases/latest/download/latest.json";
+
+fn update_endpoint() -> &'static str {
+    option_env!("TAURI_UPDATER_ENDPOINT")
+        .filter(|endpoint| !endpoint.trim().is_empty())
+        .unwrap_or(DEFAULT_UPDATE_ENDPOINT)
+}
 const UPDATE_TIMEOUT: Duration = Duration::from_secs(30);
 const UPDATER_PUBLIC_KEY: Option<&str> = option_env!("TAURI_UPDATER_PUBLIC_KEY");
 
@@ -137,7 +143,7 @@ pub(crate) async fn check_for_update(
         .filter(|key| !key.trim().is_empty())
         .ok_or(UpdateError::Unavailable)?;
     let _busy = acquire_busy(&state)?;
-    let endpoint = UPDATE_ENDPOINT.parse().map_err(|error| {
+    let endpoint = update_endpoint().parse().map_err(|error| {
         tracing::error!(%error, "invalid updater endpoint");
         UpdateError::Failed
     })?;

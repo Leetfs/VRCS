@@ -92,3 +92,9 @@ Desktop.ini
 /docs/images/*
 !/docs/images/APIKeys.png
 !/docs/images/WorkspaceID.png
+
+# OBS release staging and local signing keys
+/.release/
+/vrcs-inputs/
+*.key
+*.key.pub

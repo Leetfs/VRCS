@@ -1,0 +1,13 @@
+b9f850a7fcfd279d17911ab6781a18ea11401cadd6865bfc1634bb089e6a030d  VRCS-0.2.1.tar.xz
+7d969f4d7b44e387667d3148f61559497c22d50cbe3d50adc9e5409afbce2df1  VulkanRT-1.4.309.0-Components.zip
+d7674918d28093097614cd9728b6ca60db9ea3038f640f0bd1e9a4188c7568ce  cargo-1.99.0-x86_64-unknown-linux-gnu.tar.xz
+08f6d3c9d1c3df65c2bf738af99a073df34e450cb8685314dd74e27206de53b9  cargo-vendor.tar.xz
+12914151beed49448ded74aa3520767a8bcbc3e3deaf3188a75c98e0aa6ff423  cuda-cross-13.2.0.tar.xz
+4ab8fdb09481defb7e7025e7d5fd92a94630136403fc9cb25e76f43ddc93b70d  npm-cache.tar.xz
+6ba0e34576f95282e4c7ab4347c016eaaa929fb5f20c90c6a28fb84ca1e2724e  nsis-v311.tar.gz
+c6d4adb9bf115f4c3abbdfcab846a08eccebda9508670dea58a8e6b731026765  onnxruntime-win-x64-1.24.4-runtime.tar.xz
+a2382bf189d5621e09db647da419a8e1d4c604d60941cb116da00ce34042b1dd  rust-std-1.99.0-x86_64-pc-windows-gnu.tar.xz
+3e58dff2d0b72196b5ea4e90536e174d400de88564a52694686b81e091169933  rust-std-1.99.0-x86_64-unknown-linux-gnu.tar.xz
+77171ba2a0345fdf2abc4fedda55d6de078dae7a68527c28be8c77dcc9604bd5  rustc-1.99.0-x86_64-unknown-linux-gnu.tar.xz
+ac2b677bf42df84eec253f408384418ca73813f264260f5b698fb4e9614dbdc7  tauri-tools-2.11.4.tar.xz
+437925ada160d86ed763d29dcb9318c1bb0d024d7deaf77bc7c170b8eb6b6f10  vulkan-headers-1.4.309.tar.gz
