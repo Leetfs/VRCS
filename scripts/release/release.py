@@ -67,17 +67,10 @@ def release_notes(repository, version, previous, source):
         if subject.startswith("chore(release):"):
             continue
         authors.add(author)
-        commits.append(f"- [{sha[:8]}](https://github.com/{repository}/commit/{sha}) — {markdown(subject)}（作者：{markdown(author)}）")
+        commits.append(f"- [{sha[:8]}](https://github.com/{repository}/commit/{sha}) — {markdown(subject)} (author: {markdown(author)})")
     return (f"# VRCS {version}\n\n"
-            "由 GitHub Actions 触发 OBS，从源码构建 Windows x64 普通版与 CUDA 版。\n\n"
-            "- 普通版：CPU/Vulkan Whisper；CUDA 版额外支持 NVIDIA CUDA 加速。\n"
-            "- NSIS 3.11 / Tauri 原始模板与安装钩子；嵌入 WebView2 引导程序，缺少运行时时联网安装。\n"
-            "- CUDA 75/80/86/89/120a cubin，PTX 89 回退。CUDA 13 runtime/cuBLAS、兼容驱动需另行安装。\n"
-            "- Tauri 更新签名 `.sig` 和分版本 `latest.json` 已发布；这不是 Authenticode 签名。\n"
-            "- LLVM/MinGW 交叉编译；前端及产物检查通过，Windows/GPU 实机行为尚未验证。\n\n"
-            f"构建源码：[{source}](https://github.com/{repository}/commit/{source})\n\n"
-            "## 作者\n\n" + (", ".join(markdown(a) for a in sorted(authors)) or "无新增用户提交") +
-            "\n\n## 提交\n\n" + ("\n".join(commits) or "沿用此前发布提交。") + "\n")
+            "## Authors\n\n" + (", ".join(markdown(a) for a in sorted(authors)) or "No new contributors.") +
+            "\n\n## Commits\n\n" + ("\n".join(commits) or "No new commits since the previous release.") + "\n")
 
 
 def reserve(root, output, repository, branch):

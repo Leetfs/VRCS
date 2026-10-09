@@ -167,6 +167,13 @@ def submit(client, metadata, sources):
 def wait(client, revision, logs, timeout):
     logs.mkdir(parents=True, exist_ok=True)
     deadline = time.monotonic() + timeout
+    last_status = {}
+
+    def report(flavor, message):
+        if last_status.get(flavor) != message:
+            print(f"OBS {flavor}: {message}", flush=True)
+            last_status[flavor] = message
+
     while time.monotonic() < deadline:
         results = ET.fromstring(client.request(path("build", revision["project"], "_result") +
                                                query(repository=revision["repository"], arch=revision["arch"])))
@@ -176,7 +183,7 @@ def wait(client, revision, logs, timeout):
             name = revision["package"] + ":" + flavor
             state = statuses.get(name)
             if state is None:
-                print(flavor, "awaiting OBS scheduling", flush=True)
+                report(flavor, "Waiting for scheduling")
                 passed.append(False)
                 continue
             code = state.get("code")
@@ -191,20 +198,20 @@ def wait(client, revision, logs, timeout):
                 matching_info = revision["srcmd5"] in [info.findtext("srcmd5"), info.findtext("verifymd5")]
                 if matching_info and info.find("error") is not None:
                     raise RuntimeError(f"OBS {flavor}: {info.findtext('error')}")
-                print(flavor, code, "awaiting scheduler refresh", flush=True)
+                report(flavor, f"Waiting for scheduler refresh ({code})")
                 passed.append(False)
                 continue
             try:
                 data = client.request(base + "/_log" + query(nostream=1, start=0)).decode(errors="replace")
             except RuntimeError as error:
                 if isinstance(error.__cause__, urllib.error.HTTPError) and error.__cause__.code == 404:
-                    print(flavor, code, "awaiting first build log", flush=True)
+                    report(flavor, f"{code.capitalize()}: waiting for first build log")
                     passed.append(False)
                     continue
                 raise
             (logs / f"build-{flavor}.log").write_text(data)
             matching = revision["srcmd5"] in data[:1200]
-            print(flavor, code, f"matching revision={matching}", flush=True)
+            report(flavor, code.capitalize() + ("" if matching else ": waiting for current source revision"))
             if matching and code in ["failed", "broken", "unresolvable"]:
                 raise RuntimeError(f"OBS {flavor} failed; see build log artifact")
             passed.append(matching and code == "succeeded")

@@ -57,6 +57,11 @@ class ReleaseTests(unittest.TestCase):
             self.assertIn("Example Author", notes)
             self.assertIn(f"https://github.com/Leetfs/VRCS/commit/{sha}", notes)
             self.assertIn(r"Fix \[update\] \<link\>", notes)
+            self.assertIn("## Authors", notes)
+            self.assertIn("## Commits", notes)
+            self.assertIn("(author: Example Author)", notes)
+            self.assertNotIn("构建源码", notes)
+            self.assertNotIn("GitHub Actions", notes)
 
 
 if __name__ == "__main__":

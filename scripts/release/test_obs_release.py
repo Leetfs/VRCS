@@ -1,5 +1,7 @@
 """Regression checks for delayed OBS scheduler state and current source errors."""
 from pathlib import Path
+from contextlib import redirect_stdout
+import io
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -31,6 +33,27 @@ class SchedulerClient:
 
 
 class ObsWaitTests(unittest.TestCase):
+    def test_repeated_states_are_quiet_but_both_completions_are_reported(self):
+        class RepeatedStatusClient(SchedulerClient):
+            def request(self, url):
+                if "_result" in url:
+                    standard = "building" if self.round < 2 else "succeeded"
+                    cuda = "building" if self.round < 4 else "succeeded"
+                    self.round += 1
+                    return (f'<resultlist><result><status package="vrcs:standard" code="{standard}"/>'
+                            f'<status package="vrcs:cuda" code="{cuda}"/></result></resultlist>').encode()
+                return super().request(url)
+
+        output = io.StringIO()
+        with tempfile.TemporaryDirectory() as directory, patch('obs_release.time.sleep'), \
+                patch('obs_release.time.monotonic', return_value=0), redirect_stdout(output):
+            client = RepeatedStatusClient()
+            wait(client, REVISION, Path(directory), 600)
+        self.assertEqual(client.round, 5)
+        self.assertEqual(output.getvalue().splitlines(), [
+            'OBS standard: Building', 'OBS cuda: Building',
+            'OBS standard: Succeeded', 'OBS cuda: Succeeded'])
+
     def test_old_disabled_status_after_five_minutes_does_not_fail_new_build(self):
         with tempfile.TemporaryDirectory() as directory, patch('obs_release.time.sleep'), \
                 patch('obs_release.time.monotonic', side_effect=[0, 301, 302]):

@@ -7,6 +7,7 @@
 预留版本时原子推送 main 和临时 `obs-release/VERSION` 分支，成功发布后移除临时分支。
 这样即使 main 在长时间构建期间收到工作流修改，GitHub 仍允许 `GITHUB_TOKEN` 为准确构建提交创建 tag。
 并发 push 串行处理，待运行的任务构建当时最新 main，Release 列出自上个发布版本以来的作者和 commit 链接。
+Release 文案使用英文，仅保留版本标题、Authors 和 Commits；OBS 等待日志仅在各版本状态变化时输出。
 
 ## 一次性设置
 
