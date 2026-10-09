@@ -9,6 +9,8 @@
 ## 一次性设置
 
 先登录 `gh auth login`。需要仓库写入、workflow 和管理 Actions Secrets 的权限。
+fork 仓库还需在 GitHub 的 Actions 页面点击 `I understand my workflows, go ahead and enable them`。
+手动运行成功、REST API 显示 enabled 或单个 workflow 显示 active，不能证明 fork 的 push 触发已启用。
 OBS 项目需预先设置 `windows_x64/x86_64` 仓库；参考现有 `home:Leetfs:VRCS`，
 使用 `openSUSE:Factory/snapshot` 和 `windows:mingw:win64/openSUSE_Tumbleweed`。
 
