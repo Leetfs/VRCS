@@ -4,6 +4,8 @@
 版本递增末位，例如 `0.2.1 → 0.2.2`；版本同步到 Tauri、npm、Cargo 及锁文件。
 工作流先检查 OBS 凭据和签名密钥，再提交版本预留 commit；所有构建与签名成功后创建 tag 并发布 Release。
 版本提交使用 `GITHUB_TOKEN`，不会递归触发 push 工作流。失败可重跑并复用版本；新用户提交会预留下一个版本。
+预留版本时原子推送 main 和临时 `obs-release/VERSION` 分支，成功发布后移除临时分支。
+这样即使 main 在长时间构建期间收到工作流修改，GitHub 仍允许 `GITHUB_TOKEN` 为准确构建提交创建 tag。
 并发 push 串行处理，待运行的任务构建当时最新 main，Release 列出自上个发布版本以来的作者和 commit 链接。
 
 ## 一次性设置

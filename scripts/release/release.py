@@ -112,8 +112,19 @@ def reserve(root, output, repository, branch):
                         "apps/desktop/src-tauri/tauri.conf.json", "apps/desktop/package.json", "package-lock.json"], check=True)
         subprocess.run(["git", "commit", "-m", f"chore(release): {version} [skip ci]"], check=True)
         # Never force-push over a user commit arriving while versions are reserved.
-        subprocess.run(["git", "push", "origin", f"HEAD:refs/heads/{branch}"], check=True)
+        # Keep this workflow tree reachable from a branch until its tag is
+        # published. GitHub otherwise rejects GITHUB_TOKEN tag pushes if main
+        # receives a workflow change during the OBS build.
+        subprocess.run(["git", "push", "--atomic", "origin", f"HEAD:refs/heads/{branch}",
+                        f"HEAD:refs/heads/obs-release/{version}"], check=True)
         head = run("git", "rev-parse", "HEAD")
+    snapshot = f"refs/heads/obs-release/{state['version']}"
+    remote = run("git", "ls-remote", "origin", snapshot)
+    if remote and remote.split()[0] != head:
+        raise ValueError("Release snapshot branch points at another commit")
+    if not remote:
+        # Resume releases reserved before snapshot branches were introduced.
+        subprocess.run(["git", "push", "origin", f"{head}:{snapshot}"], check=True)
     state["version_commit"] = head
     state["published_at"] = datetime.now(timezone.utc).isoformat()
     (output / "release.json").write_text(json.dumps(state, indent=2) + "\n")
@@ -150,6 +161,11 @@ def publish(metadata, artifacts, notes):
         raise ValueError("Incomplete installer/signature/checksum set")
     subprocess.run(["gh", "release", "upload", version, "--repo", repository, "--clobber", *map(str, sorted(assets))], check=True)
     subprocess.run(["gh", "release", "edit", version, "--repo", repository, "--draft=false", "--latest"], check=True)
+    cleanup = subprocess.run(["gh", "api", "--method", "DELETE",
+                              f"repos/{repository}/git/refs/heads/obs-release/{version}"],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if cleanup.returncode:
+        print("Release published; temporary snapshot branch cleanup can be retried")
     print(f"Published https://github.com/{repository}/releases/tag/{version}")
 
 
