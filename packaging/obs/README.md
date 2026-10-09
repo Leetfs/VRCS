@@ -36,6 +36,32 @@ Cargo/npm 锁文件的外部依赖变化会重新生成 vendor/cache；单纯版
 如升级 Rust/CUDA/Tauri/运行库，在新的 OBS 基线中准备归档后同步 pins 和缓存指纹。
 `prepare_dependencies.py` 保存官方依赖归档准备函数；工作流只在锁文件变化时调用需要的函数。
 
+### 固定归档的实际来源与传输链路
+
+| OBS 文件 | 官方来源及准备方式 |
+| --- | --- |
+| rustc/cargo/rust-std 1.99.0 `.tar.xz` | `static.rust-lang.org/dist` 官方发行包，按 Rust channel manifest 中的 hash 校验；原包上传 |
+| cuda-cross-13.2.0.tar.xz | NVIDIA 官方 CUDA redist manifest 指向的 Linux device tools、Windows headers/import libraries，与 NVIDIA CCCL 2.8.2 源码合并；移除 runtime DLL，生成 GNU import 所需 exports，重新打包 |
+| VulkanRT-1.4.309.0-Components.zip | LunarG `sdk.lunarg.com` 官方 Windows Vulkan loader；原包上传 |
+| vulkan-headers-1.4.309.tar.gz | KhronosGroup/Vulkan-Headers 的 v1.4.309 源码；原包上传 |
+| onnxruntime-win-x64-1.24.4-runtime.tar.xz | microsoft/onnxruntime 官方 Windows 1.24.4 zip，去掉 PDB 后重新打包；运行库为第三方预编译 DLL |
+| tauri-tools-2.11.4.tar.xz | npm 官方 Tauri CLI JS/Linux binding、tauri-apps 官方 NSIS 3.11 stubs/includes/plugins、nsis_tauri_utils 0.5.3，以及微软 WebView2 bootstrapper；合并打包 |
+| nsis-v311.tar.gz | kichik/nsis 官方 v311 源码；Linux makensis 在 OBS 内编译，Windows installer stubs/plugins 来自上述官方二进制包 |
+
+这些固定归档最初由本机准备脚本从官方 HTTPS 地址下载并上传到 OBS，
+成功的源修订 25 保留全部输入。Rust/NVIDIA 原始组件按官方 manifest 校验；其他下载项固定 SHA-256。
+自己合并/裁剪的归档，其整体 SHA-256 由准备过程生成并维护，不是厂商提供的聚合包。
+
+当前 Actions 首先执行 OBS 服务端 `cmd=copy`，来源为
+`home:Leetfs:VRCS/vrcs-windows@25`，目标为变量指定的发布包。
+OBS 在服务端复制已有源文件，因此 GitHub runner 不重复下载/上传这些固定大包。
+随后 Actions 上传本次源码、spec、脚本、公开更新配置和 SHA256SUMS.inputs，
+用 commitfilelist 提交最终文件集合，移除旧版本源码及不用的基线文件。
+最后分别显式请求 `包名:standard`、`包名:cuda` 的 rebuild，并核对 srcmd5 对应的构建日志。
+
+VRCS/Whisper/前端在 OBS 源码构建；Rust/CUDA 编译工具及 ONNX/Vulkan runtime、
+NSIS stubs/plugins 属于固定第三方预编译输入。当前工作流需要上述已有 OBS 基线。
+
 OBS 不接收私钥。它只嵌入公钥及本仓库 HTTPS 更新地址，使用 Linux LLVM/MinGW 交叉编译。
 GitHub 下载后验证版本/源码提交/公钥/校验和，以 Tauri CLI 签名，再用独立 minisign 验证。
 `latest.json` 分别提供 `windows-x86_64-standard` 和 `windows-x86_64-cuda`，客户端按功能选择目标。
