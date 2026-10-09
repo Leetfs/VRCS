@@ -143,7 +143,10 @@ def publish(metadata, artifacts, notes):
         if existing.stdout.strip() != commit:
             raise ValueError(f"Existing tag {version} points at another commit")
     else:
-        subprocess.run(["git", "tag", "-a", version, commit, "-m", f"VRCS {version}"], check=True)
+        # Recovery skips reserve(), so tag creation must set its own identity.
+        subprocess.run(["git", "-c", "user.name=github-actions[bot]", "-c",
+                        "user.email=41898282+github-actions[bot]@users.noreply.github.com",
+                        "tag", "-a", version, commit, "-m", f"VRCS {version}"], check=True)
     subprocess.run(["git", "push", "origin", f"refs/tags/{version}"], check=True)
     view = subprocess.run(["gh", "release", "view", version, "--repo", repository, "--json", "isDraft"], capture_output=True, text=True)
     if view.returncode:
