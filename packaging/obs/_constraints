@@ -1,0 +1,7 @@
+<constraints>
+  <hardware>
+    <processors>8</processors>
+    <memory><size unit="G">24</size></memory>
+    <disk><size unit="G">30</size></disk>
+  </hardware>
+</constraints>

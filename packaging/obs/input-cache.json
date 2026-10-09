@@ -1,0 +1,10 @@
+{
+  "project": "home:Leetfs:VRCS",
+  "package": "vrcs-windows",
+  "revision": "25",
+  "lock_fingerprints": {
+    "core/Cargo.lock": "aca757582608aa2e3d5b01b28358d695d9d243c44b6e8a569cfe62bc3902e1bf",
+    "apps/desktop/src-tauri/Cargo.lock": "8d35dfddaac12111ef1cee328550741241c0bff78a38dd0890010cb5ebd9c443",
+    "package-lock.json": "6b34083f33d9d6b11a68b820346a19468abbf15f3fdc75188e1057d0e9874aec"
+  }
+}
