@@ -166,8 +166,7 @@ def submit(client, metadata, sources):
 
 def wait(client, revision, logs, timeout):
     logs.mkdir(parents=True, exist_ok=True)
-    started = time.monotonic()
-    deadline = started + timeout
+    deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         results = ET.fromstring(client.request(path("build", revision["project"], "_result") +
                                                query(repository=revision["repository"], arch=revision["arch"])))
@@ -183,15 +182,18 @@ def wait(client, revision, logs, timeout):
             code = state.get("code")
             if code == "finished":
                 code = state.findtext("details") or code
-            if code in ["broken", "unresolvable", "disabled", "excluded"]:
-                # OBS may briefly return the disabled/pre-copy revision until its
-                # scheduler refreshes metadata after the atomic source upload.
-                if time.monotonic() - started < 120:
-                    print(flavor, code, "awaiting scheduler refresh", flush=True)
-                    passed.append(False)
-                    continue
-                raise RuntimeError(f"OBS {flavor}: {code}: {state.findtext('details')}")
             base = path("build", revision["project"], revision["repository"], revision["arch"], name)
+            if code in ["broken", "unresolvable", "disabled", "excluded"]:
+                # The result can retain pre-upload flags for several minutes.
+                # Fail only on an error from build information for our source,
+                # rather than interpreting an old disabled status as a failure.
+                info = ET.fromstring(client.request(base + "/_buildinfo"))
+                matching_info = revision["srcmd5"] in [info.findtext("srcmd5"), info.findtext("verifymd5")]
+                if matching_info and info.find("error") is not None:
+                    raise RuntimeError(f"OBS {flavor}: {info.findtext('error')}")
+                print(flavor, code, "awaiting scheduler refresh", flush=True)
+                passed.append(False)
+                continue
             try:
                 data = client.request(base + "/_log" + query(nostream=1, start=0)).decode(errors="replace")
             except RuntimeError as error:
@@ -210,6 +212,58 @@ def wait(client, revision, logs, timeout):
             return
         time.sleep(30)
     raise TimeoutError("OBS did not finish before the release timeout")
+
+
+def restore(client, run_id, output):
+    if not re.fullmatch(r"\d+", run_id):
+        raise ValueError("A numeric GitHub Actions run ID is required")
+    repository = os.environ["GITHUB_REPOSITORY"]
+    recovery = output / "recovery"
+    subprocess.run(["gh", "run", "download", run_id, "--repo", repository,
+                    "--name", "obs-release-" + run_id, "--dir", str(recovery)], check=True)
+    saved = recovery / ".release"
+    metadata = json.loads((saved / "release.json").read_text())
+    revision = json.loads((saved / "obs-revision.json").read_text())
+    if metadata["repository"] != repository:
+        raise ValueError("Recovery metadata belongs to another repository")
+    from release import version_tuple
+    version_tuple(metadata["version"])
+    commit = metadata["version_commit"]
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise ValueError("Invalid recovery commit")
+    subprocess.run(["git", "merge-base", "--is-ancestor", commit, "origin/" + os.environ["RELEASE_BRANCH"]], check=True)
+    state = json.loads(subprocess.check_output(["git", "show", commit + ":.release-state.json"], text=True))
+    if any(state[k] != metadata[k] for k in ["repository", "version", "source_commit", "previous_tag"]):
+        raise ValueError("Recovery metadata does not match the reserved source commit")
+    expected = {"project": os.environ["OBS_PROJECT"], "package": os.environ["OBS_PACKAGE"],
+                "repository": os.environ["OBS_REPOSITORY"], "arch": "x86_64"}
+    if any(revision[k] != v for k, v in expected.items()):
+        raise ValueError("Recovery OBS target differs from this workflow")
+    target = path("source", revision["project"], revision["package"])
+    current = ET.fromstring(client.request(target))
+    pinned = ET.fromstring(client.request(target + query(rev=revision["revision"])))
+    if current.get("srcmd5") != revision["srcmd5"] or pinned.get("srcmd5") != revision["srcmd5"]:
+        raise ValueError("OBS source changed; cannot recover the previous build")
+    settings = json.loads(client.request(target + "/release-settings.json" + query(rev=revision["revision"])))
+    endpoint = f"https://github.com/{repository}/releases/latest/download/latest.json"
+    if (settings["commit"] != commit or settings["repository"] != repository or settings["endpoint"] != endpoint
+            or settings["public_key"] != os.environ["TAURI_UPDATER_PUBLIC_KEY"].strip()):
+        raise ValueError("Recovery source/signing key mismatch")
+    sources = output / "sources"
+    sources.mkdir(parents=True, exist_ok=True)
+    name = "VRCS-" + metadata["version"] + ".tar.xz"
+    data = client.request(target + "/" + name + query(rev=revision["revision"]))
+    sums = client.request(target + "/SHA256SUMS.inputs" + query(rev=revision["revision"])).decode()
+    pins = dict((line.split("  ", 1)[1], line.split("  ", 1)[0]) for line in sums.splitlines())
+    if hashlib.sha256(data).hexdigest() != pins[name]:
+        raise ValueError("Recovery source archive checksum mismatch")
+    (sources / name).write_bytes(data)
+    for name in ["release.json", "obs-revision.json", "notes.md"]:
+        shutil.copyfile(saved / name, output / name)
+    if os.getenv("GITHUB_OUTPUT"):
+        with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+            f.write(f"version={metadata['version']}\ncommit={commit}\n")
+    print(f"Recovered release {metadata['version']} at OBS revision {revision['revision']}; no source resubmission")
 
 
 def download(client, revision, metadata, artifacts):
@@ -245,15 +299,20 @@ def download(client, revision, metadata, artifacts):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=["preflight", "build"])
+    parser.add_argument("command", choices=["preflight", "build", "restore"])
+    parser.add_argument("--run-id")
+    parser.add_argument("--resume", action="store_true")
     parser.add_argument("--metadata", type=Path, default=Path(".release/release.json"))
     parser.add_argument("--artifacts", type=Path, default=Path("release-artifacts"))
     parser.add_argument("--timeout", type=int, default=10800)
     args = parser.parse_args()
     client = Client()
     preflight(client)
+    if args.command == "restore":
+        restore(client, args.run_id or "", args.metadata.parent)
     if args.command == "build":
         metadata = json.loads(args.metadata.read_text())
-        revision = submit(client, metadata, args.metadata.parent / "sources")
+        revision = json.loads((args.metadata.parent / "obs-revision.json").read_text()) if args.resume else submit(
+            client, metadata, args.metadata.parent / "sources")
         wait(client, revision, args.metadata.parent / "logs", args.timeout)
         download(client, revision, metadata, args.artifacts)

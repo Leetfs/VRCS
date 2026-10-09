@@ -68,6 +68,8 @@ NSIS stubs/plugins 属于固定第三方预编译输入。当前工作流需要�
 
 OBS 不接收私钥。它只嵌入公钥及本仓库 HTTPS 更新地址，使用 Linux LLVM/MinGW 交叉编译。
 GitHub 下载后验证版本/源码提交/公钥/校验和，以 Tauri CLI 签名，再用独立 minisign 验证。
+上游在 Tauri 打包阶段自动生成 `.sig`；这里使用同版本 Tauri CLI 在 OBS 出包后生成。
+两者都是相同验证格式的分离式更新签名，不修改 EXE 字节；签名文本的时间戳/文件名可能不同。
 `latest.json` 分别提供 `windows-x86_64-standard` 和 `windows-x86_64-cuda`，客户端按功能选择目标。
 发布先建 draft、上传完整 EXE/.sig/.sha256/latest.json/源码及 provenance，最后才公开为 latest。
 Tauri 更新签名不等于 Windows Authenticode。以前禁用更新的 OBS 0.2.1 客户端需要手动安装首个签名版。
@@ -76,6 +78,7 @@ Tauri 更新签名不等于 Windows Authenticode。以前禁用更新的 OBS 0.2
 
 - OBS：已有前端单元测试、i18n、最终 x64 PE、每个 CUDA fatbinary 的五架构及 PTX 检查。
 - Actions：版本/锁文件同步、依赖缓存失效、作者/commit 记录的少量测试。
+- OBS 等待：旧 disabled 状态延迟刷新及当前源修订真实错误的回归检查。
 - 签名：发布前验证密钥匹配、拒绝被修改的字节，并验证两版最终 EXE 的签名。
 - 上游原有 Rust/前端测试代码及 CI 保留；Linux OBS 无法执行 Windows/GPU 实机测试。
 
@@ -88,9 +91,13 @@ CUDA 为 75/80/86/89/120a cubin 与 PTX 89。Cargo/CMake/NSIS 编译使用 `npro
 ```sh
 gh workflow run release.yml --repo OWNER/VRCS
 gh run list --repo OWNER/VRCS --workflow release.yml
+# 已提交 OBS 源码，但等待/签名/发布阶段失败时，复用该任务的准确修订：
+gh workflow run release.yml --repo OWNER/VRCS -f resume_run_id=FAILED_RUN_ID
 ```
 
 失败保留 Actions artifact 中的 OBS build logs、源修订及打包配置。
+恢复入口核对仓库、版本提交、OBS 当前/固定修订、源码校验和及公钥，跳过重新上传与重建。
+如果 OBS 已提交其他源码，它拒绝复用旧结果。旧 disabled 状态不能只凭固定延迟判为失败。
 OBS 包常驻以便后续重建；项目配置和之前手动构建的包不会被覆盖。
 发布前提交版本失败时不会 force-push，避免覆盖构建期间到达的新提交。
 GitHub 分支保护如果阻止 bot 版本提交，应配置允许发布 bot 写入或改为版本 PR 流程。

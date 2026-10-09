@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      resume_run_id:
+        description: 'Optional failed run ID: reuse its exact OBS source revision and version'
+        type: string
+        required: false
 
 permissions:
   contents: write
@@ -28,6 +33,7 @@ jobs:
       OBS_USERNAME: ${{ secrets.OBS_USERNAME }}
       OBS_PASSWORD: ${{ secrets.OBS_PASSWORD }}
       TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
+      RESUME_RUN_ID: ${{ inputs.resume_run_id || '' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -53,12 +59,20 @@ jobs:
           python3 scripts/release/sign_release.py preflight
           python3 -m unittest discover -s scripts/release -p 'test_*.py' -v
 
-      - name: Reserve the next patch version
+      - name: Reserve or recover the release version
         id: version
-        run: python3 scripts/release/release.py reserve
+        run: |
+          if [ -n "$RESUME_RUN_ID" ]; then
+            python3 scripts/release/obs_release.py restore --run-id "$RESUME_RUN_ID"
+          else
+            python3 scripts/release/release.py reserve
+          fi
 
       - name: Submit source and wait for both OBS installers
-        run: python3 scripts/release/obs_release.py build
+        run: |
+          resume_args=()
+          if [ -n "$RESUME_RUN_ID" ]; then resume_args+=(--resume); fi
+          python3 scripts/release/obs_release.py build "${resume_args[@]}"
 
       - name: Sign and verify installers; create updater metadata
         env:
