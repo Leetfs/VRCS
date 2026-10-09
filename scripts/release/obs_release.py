@@ -154,6 +154,13 @@ def submit(client, metadata, sources):
                 "arch": "x86_64", "revision": result.get("rev"), "srcmd5": result.get("srcmd5")}
     (sources.parent / "obs-revision.json").write_text(json.dumps(revision, indent=2) + "\n")
     print(f"Submitted OBS revision {revision['revision']} / {revision['srcmd5']}", flush=True)
+    for flavor in ["standard", "cuda"]:
+        result = ET.fromstring(client.request(path("build", project) + query(
+            cmd="rebuild", package=package + ":" + flavor,
+            repository=revision["repository"], arch=revision["arch"]), "POST", b""))
+        if result.get("code") != "ok":
+            raise RuntimeError(f"OBS did not accept {flavor} rebuild")
+        print(f"Explicitly triggered OBS {package}:{flavor}", flush=True)
     return revision
 
 
